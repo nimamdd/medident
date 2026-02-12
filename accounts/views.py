@@ -99,7 +99,7 @@ class AuthVerifyView(generics.GenericAPIView):
         user = get_object_or_404(User, phone=phone)
         if not user.is_active:
             return Response({"detail": "User account is disabled."}, status=status.HTTP_403_FORBIDDEN)
-
+        print('nima')
         refresh = RefreshToken.for_user(user)
         return Response(
             {"refresh": str(refresh), "access": str(refresh.access_token)},
