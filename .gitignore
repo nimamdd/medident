@@ -3,3 +3,9 @@
 .env
 __pycache__/
 db.sqlite3
+
+staticfiles/
+media/
+
+medident_deploy_key
+medident_deploy_key.pub
