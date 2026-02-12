@@ -2,7 +2,7 @@ name: Deploy medident (backend)
 
 on:
   push:
-    branches: ["backend"]
+    branches: ["main"]
 
 jobs:
   deploy:
