@@ -1,12 +1,11 @@
 from django.urls import path
-from accounts.views import *
+
+from accounts.views import AuthStartView, AuthVerifyView, MeView, AdminUserListView, AdminUserDetailView
 
 urlpatterns = [
-    path('register/', UserRegistrationView.as_view(), name='register'),
-    path('login/start/', LoginStartView.as_view(), name='login_start'),
-    path('login/verify/', LoginVerifyView.as_view(), name='login_verify'),
-    path("password/reset/start/", PasswordResetStartView.as_view()),
-    path("password/reset/verify/", PasswordResetVerifyView.as_view()),
-    path("me/", MeView.as_view(), name="me"),
-
+    path("auth/start/", AuthStartView.as_view()),
+    path("auth/verify/", AuthVerifyView.as_view()),
+    path("me/", MeView.as_view()),
+    path("admin/users/", AdminUserListView.as_view()),
+    path("admin/users/<int:pk>/", AdminUserDetailView.as_view()),
 ]
