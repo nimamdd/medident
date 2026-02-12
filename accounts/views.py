@@ -141,7 +141,7 @@ class MeView(generics.RetrieveUpdateAPIView):
         return UserReadSerializer
 
 
-class AdminUserListView(generics.ListAPIView):
+class UserListView(generics.ListAPIView):
     """
     List users for admin panel.
 
@@ -164,7 +164,7 @@ class AdminUserListView(generics.ListAPIView):
     serializer_class = AdminUserReadSerializer
 
 
-class AdminUserDetailView(generics.RetrieveUpdateAPIView):
+class UserDetailView(generics.RetrieveUpdateAPIView):
     """
     Retrieve or update a user (admin only).
 
