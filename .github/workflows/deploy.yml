@@ -1,4 +1,4 @@
-name: Deploy medident (backend)
+name: Deploy medident
 
 on:
   push:
@@ -17,12 +17,13 @@ jobs:
           script: |
             set -e
             cd /home/ubuntu/apps/medident
+
             git fetch --all
-            git reset --hard origin/backend
+            git checkout -B main origin/main
+            git reset --hard origin/main
 
             source .venv/bin/activate
-            pip install -r requirements.txt
-
+            pip install -r requirments.txt
             python manage.py migrate --noinput
             python manage.py collectstatic --noinput
 
