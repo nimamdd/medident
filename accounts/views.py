@@ -164,7 +164,7 @@ class UserListView(generics.ListAPIView):
     serializer_class = AdminUserReadSerializer
 
 
-class UserDetailView(generics.RetrieveUpdateAPIView):
+class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     Retrieve or update a user (admin only).
 

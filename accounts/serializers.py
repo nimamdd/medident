@@ -26,9 +26,9 @@ class UserUpdateSerializer(serializers.ModelSerializer):
 
 class AdminUserReadSerializer(UserReadSerializer):
     class Meta(UserReadSerializer.Meta):
-        fields = UserReadSerializer.Meta.fields + ("is_active", "is_staff", "is_admin", "is_superuser")
+        fields = UserReadSerializer.Meta.fields + ("is_active", "is_admin")
 
 
 class AdminUserUpdateSerializer(UserUpdateSerializer):
     class Meta(UserUpdateSerializer.Meta):
-        fields = UserUpdateSerializer.Meta.fields + ("is_active", "is_staff", "is_admin")
+        fields = UserUpdateSerializer.Meta.fields + ("is_active", "is_admin")
