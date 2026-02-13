@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'corsheaders',
     "rest_framework",
     "rest_framework_simplejwt",
     "drf_spectacular",
@@ -50,6 +51,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -161,3 +163,5 @@ SIMPLE_JWT = {
 AMOOTSMS_TOKEN = env("AMOOTSMS_TOKEN")
 AMOOTSMS_PATTERN_ID = env("AMOOTSMS_PATTERN_ID")
 AMOOTSMS_URL = env("AMOOTSMS_URL")
+
+CORS_ALLOW_ALL_ORIGINS = True
