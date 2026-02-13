@@ -186,7 +186,6 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
       - address: string (optional)
       - email: string (optional)
       - is_active: bool (optional)
-      - is_staff: bool (optional)
       - is_admin: bool (optional)
 
     PATCH/PUT Responses:
