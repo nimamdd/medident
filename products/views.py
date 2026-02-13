@@ -6,7 +6,6 @@ from rest_framework.views import APIView
 
 from products.models import Category, Product, ProductReview
 from products.permissions import IsAdmin
-from products.paginations import ProductsPagination
 from products.serializers import (
     CategorySerializer,
     ProductSerializer,
@@ -63,7 +62,6 @@ class ProductsListView(generics.ListAPIView):
 
     permission_classes = (permissions.AllowAny,)
     serializer_class = ProductSerializer
-    pagination_class = ProductsPagination
 
     def get_queryset(self):
         qs = (

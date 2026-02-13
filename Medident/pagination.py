@@ -1,7 +1,9 @@
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.response import Response
 
-class ProductsPagination(PageNumberPagination):
-    page_size = 12
+
+class StandardPagination(PageNumberPagination):
+    page_size = 20
     page_size_query_param = "pageSize"
     max_page_size = 100
 
@@ -14,3 +16,4 @@ class ProductsPagination(PageNumberPagination):
                 "total": self.page.paginator.count,
             }
         )
+
