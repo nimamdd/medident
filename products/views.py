@@ -5,8 +5,9 @@ from django.utils import timezone
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.parsers import MultiPartParser, FormParser
 
-from products.models import Category, Product, ProductReview
+from products.models import Category, Product, ProductReview, ProductImage
 from products.permissions import IsAdmin
 from products.serializers import (
     CategorySerializer,
@@ -14,6 +15,7 @@ from products.serializers import (
     AdminProductWriteSerializer,
     ProductReviewSerializer,
     AdminReviewPatchSerializer,
+    ProductImageSerializer,
 )
 
 
@@ -142,11 +144,19 @@ class AdminProductsView(generics.ListCreateAPIView):
 
     Methods:
       - GET: list products
-      - POST: create a product (supports nested create)
+      - POST: create a product
 
     Auth:
       - Requires: Authorization: Bearer <access_token>
       - Requires: is_admin == True
+
+    Notes on images (Gallery workflow):
+      - Product images are stored in the ProductImage gallery.
+      - When creating/updating a product you DO NOT upload images here.
+      - You attach existing gallery images by providing their IDs under "images".
+      - If "images" is omitted: product images are NOT changed.
+      - If "images" is []: product images will be cleared.
+      - If "images" is provided (non-empty): it will replace the product images (M2M set).
 
     GET query params:
       - q: string (search by title/slug/sku/brand)
@@ -154,12 +164,12 @@ class AdminProductsView(generics.ListCreateAPIView):
       - inStock: true|false|1|0
 
     POST input (JSON):
-      - slug: string (unique)
-      - title: string
-      - shortDescription: string
-      - description: string (optional)
-      - sku: string (optional)
-      - brand: string (optional)
+      - slug: string (unique, required)
+      - title: string (required)
+      - shortDescription: string (required)
+      - description: string (optional, nullable)
+      - sku: string (optional, nullable)
+      - brand: string (optional, nullable)
       - categorySlug: string (required)
       - priceToman: int (required)
       - compareAtPriceToman: int (optional, nullable)
@@ -167,32 +177,21 @@ class AdminProductsView(generics.ListCreateAPIView):
       - stockQuantity: int (optional, nullable)
       - rating: number/string (optional, nullable)
 
-      Nested (optional):
-      - images: ProductImage[]
-        - alt: string
-        - src: file/url/null (depends on your upload setup)
-        - width: int (optional)
-        - height: int (optional)
-        - position: int (optional)
+      Optional nested:
+      - images: list[{id: UUID}]
+        Example:
+          "images": [{"id": "<product_image_uuid>"}, {"id": "<product_image_uuid>"}]
 
-      - specs: ProductSpec[]
-        - key: string
-        - value: string
+      - specs: list[{key: string, value: string}]
         Note: keys must be unique per product.
 
-      - seo: ProductSeo (optional, nullable)
-        - title: string (optional)
-        - description: string (optional)
-        - canonical: url (optional)
+      - seo: {title?: string, description?: string, canonical?: url} | null
 
-      - dimensions: ProductDimensions (optional, nullable)
-        - lengthMm: int (optional)
-        - widthMm: int (optional)
-        - heightMm: int (optional)
+      - dimensions: {lengthMm?: int, widthMm?: int, heightMm?: int} | null
 
-    Response:
+    Responses:
       - 200 OK: list products (ProductSerializer)
-      - 201 Created: created product (ProductSerializer, includes images/specs/seo/dimensions/reviews)
+      - 201 Created: created product (ProductSerializer)
       - 400 Bad Request: validation error
       - 401 Unauthorized: missing/invalid token
       - 403 Forbidden: not admin
@@ -224,7 +223,7 @@ class AdminProductDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     Methods:
       - GET: retrieve product (ProductSerializer)
-      - PATCH/PUT: update product (supports nested update)
+      - PATCH/PUT: update product (AdminProductWriteSerializer input, ProductSerializer output)
       - DELETE: delete product
 
     Auth:
@@ -237,18 +236,29 @@ class AdminProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     PATCH/PUT input (JSON):
       Same fields as create are accepted. Partial update is allowed for PATCH.
 
-      Nested update behavior:
-      - If "images" is present in payload:
-          existing images will be replaced (delete all + recreate from input).
-      - If "specs" is present in payload:
-          existing specs will be replaced (delete all + recreate from input).
-      - If "seo" is present:
-          update_or_create will be used (or delete if explicitly null).
-      - If "dimensions" is present:
-          update_or_create will be used (or delete if explicitly null).
+      Images behavior (M2M to gallery):
+      - If "images" is omitted: images are NOT changed.
+      - If "images" is []: all images will be cleared (product.images.set([])).
+      - If "images" is provided: it replaces the product's images (product.images.set([...])).
+      - This endpoint does NOT upload image files; use the gallery endpoints to upload first.
+
+      Specs behavior:
+      - If "specs" is omitted: specs are NOT changed.
+      - If "specs" is present: existing specs will be replaced (delete + recreate).
+        Note: spec keys must be unique per product.
+
+      SEO behavior:
+      - If "seo" is omitted: seo is NOT changed.
+      - If "seo" is null: seo row will be deleted.
+      - If "seo" is an object: update_or_create will be used.
+
+      Dimensions behavior:
+      - If "dimensions" is omitted: dimensions are NOT changed.
+      - If "dimensions" is null: dimensions row will be deleted.
+      - If "dimensions" is an object: update_or_create will be used.
 
     Responses:
-      - 200 OK: product returned/updated (ProductSerializer, includes images/specs/seo/dimensions/reviews)
+      - 200 OK: product returned/updated (ProductSerializer)
       - 204 No Content: product deleted
       - 400 Bad Request: validation error
       - 401 Unauthorized: missing/invalid token
@@ -360,3 +370,163 @@ class AdminProductReviewDetailView(APIView):
         review = get_object_or_404(ProductReview, id=review_id, product=product)
         review.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AdminCategoriesView(generics.ListCreateAPIView):
+    """
+    Admin list and create categories.
+
+    Methods:
+      - GET: list categories
+      - POST: create category
+
+    Auth:
+      - Requires: Authorization: Bearer <access_token>
+      - Requires: is_admin == True
+
+    GET query params:
+      - q: string (search in title/slug)
+
+    POST input (JSON):
+      - slug: string (unique)
+      - title: string
+
+    Responses:
+      - 200 OK: list categories
+      - 201 Created: created category
+      - 400 Bad Request: validation error
+      - 401 Unauthorized: missing/invalid token
+      - 403 Forbidden: not admin
+    """
+    permission_classes = (IsAdmin,)
+    serializer_class = CategorySerializer
+    queryset = Category.objects.all().order_by("title")
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        q = self.request.query_params.get("q")
+        if q:
+            qs = qs.filter(Q(title__icontains=q) | Q(slug__icontains=q))
+        return qs
+
+
+class AdminCategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Admin retrieve, update, and delete a category.
+
+    Methods:
+      - GET: retrieve category
+      - PATCH/PUT: update category
+      - DELETE: delete category
+
+    Auth:
+      - Requires: Authorization: Bearer <access_token>
+      - Requires: is_admin == True
+
+    URL params:
+      - id: string (UUID)
+
+    PATCH/PUT input (JSON):
+      - slug: string (unique)
+      - title: string
+
+    Responses:
+      - 200 OK: category returned/updated
+      - 204 No Content: category deleted
+      - 400 Bad Request: validation error
+      - 401 Unauthorized: missing/invalid token
+      - 403 Forbidden: not admin
+      - 404 Not Found: category not found
+
+    Notes:
+      - Deleting a category that is referenced by products may fail because Product.category uses PROTECT.
+    """
+    permission_classes = (IsAdmin,)
+    serializer_class = CategorySerializer
+    queryset = Category.objects.all()
+    lookup_field = "id"
+
+
+class AdminProductImagesView(generics.ListCreateAPIView):
+    """
+       Admin list and upload product images (gallery).
+
+       Methods:
+         - GET: list images in gallery
+         - POST: upload a new image to gallery
+
+       Auth:
+         - Requires: Authorization: Bearer <access_token>
+         - Requires: is_admin == True
+
+       GET query params:
+         - q: string (search in alt)
+
+       POST input (multipart/form-data):
+         - src: file (required)
+         - alt: string (optional, nullable)
+         - width: int (optional)   # only if you want to send manually; otherwise leave empty
+         - height: int (optional)  # only if you want to send manually; otherwise leave empty
+
+       Notes:
+         - This endpoint returns the ProductImage "id". Use that id when attaching images to products.
+
+       Responses:
+         - 200 OK: list images
+         - 201 Created: created image
+         - 400 Bad Request: validation error
+         - 401 Unauthorized: missing/invalid token
+         - 403 Forbidden: not admin
+       """
+    permission_classes = (IsAdmin,)
+    serializer_class = ProductImageSerializer
+    queryset = ProductImage.objects.all().order_by("-id")
+    parser_classes = (MultiPartParser, FormParser)
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        q = self.request.query_params.get("q")
+        if q:
+            qs = qs.filter(alt__icontains=q)
+        return qs
+
+
+class AdminProductImageDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Admin retrieve, update, and delete a product image (gallery item).
+
+    Methods:
+      - GET: retrieve image
+      - PATCH/PUT: update image fields
+      - DELETE: delete image
+
+    Auth:
+      - Requires: Authorization: Bearer <access_token>
+      - Requires: is_admin == True
+
+    URL params:
+      - id: string (UUID)
+
+    PATCH/PUT input:
+      - Accepts multipart/form-data (for src file) and normal form fields:
+        - src: file (optional)
+        - alt: string (optional, nullable)
+        - width: int (optional, nullable)
+        - height: int (optional, nullable)
+
+    Notes:
+      - If an image is linked to products, deleting it will remove the M2M relationships as well.
+
+    Responses:
+      - 200 OK: image returned/updated
+      - 204 No Content: image deleted
+      - 400 Bad Request: validation error
+      - 401 Unauthorized: missing/invalid token
+      - 403 Forbidden: not admin
+      - 404 Not Found: image not found
+    """
+    permission_classes = (IsAdmin,)
+    serializer_class = ProductImageSerializer
+    queryset = ProductImage.objects.all()
+    lookup_field = "id"
+    parser_classes = (MultiPartParser, FormParser)

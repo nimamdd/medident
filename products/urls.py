@@ -13,4 +13,8 @@ urlpatterns = [
         views.AdminProductReviewDetailView.as_view(),
         name="admin-product-review-detail",
     ),
+    path("admin/categories/", views.AdminCategoriesView.as_view(), name="admin-categories"),
+    path("admin/categories/<uuid:id>/", views.AdminCategoryDetailView.as_view(), name="admin-category-detail"),
+    path("admin/images/", views.AdminProductImagesView.as_view()),
+    path("admin/images/<uuid:id>/", views.AdminProductImageDetailView.as_view()),
 ]

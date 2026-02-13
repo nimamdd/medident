@@ -21,6 +21,12 @@ class Product(models.Model):
     short_description = models.TextField()
     description = models.TextField(blank=True, null=True)
 
+    images = models.ManyToManyField(
+        "ProductImage",
+        related_name="products",
+        blank=True,
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -43,16 +49,13 @@ class Product(models.Model):
 
 class ProductImage(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="images")
-    alt = models.CharField(max_length=255)
+    alt = models.CharField(max_length=255, blank=True, null=True)
     src = models.ImageField(blank=True, null=True, upload_to='product_images/')
     width = models.PositiveIntegerField(blank=True, null=True)
     height = models.PositiveIntegerField(blank=True, null=True)
-    position = models.PositiveIntegerField(default=0)
 
     class Meta:
-        ordering = ["position", "id"]
-
+        ordering = ["id"]
 
 class ProductSpec(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

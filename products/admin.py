@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.utils import timezone
+
 from .models import (
     Category,
     Product,
@@ -12,11 +13,16 @@ from .models import (
 
 
 class ProductImageInline(admin.TabularInline):
-    model = ProductImage
+    """
+    Manage Product.images (ManyToMany) from inside Product admin.
+
+    Note:
+      - ProductImage is now a gallery model (no FK to Product).
+      - We edit the M2M link via the implicit through table.
+    """
+    model = Product.images.through
     extra = 0
-    ordering = ("position", "id")
-    fields = ("alt", "src", "width", "height", "position")
-    readonly_fields = ("id",)
+    autocomplete_fields = ("productimage",)
 
 
 class ProductSpecInline(admin.TabularInline):
@@ -76,8 +82,17 @@ class ProductAdmin(admin.ModelAdmin):
     search_fields = ("title", "slug", "sku", "brand", "category__title", "category__slug")
     prepopulated_fields = {"slug": ("title",)}
     readonly_fields = ("id", "created_at", "updated_at")
-    inlines = (ProductSeoInline, ProductDimensionsInline, ProductImageInline, ProductSpecInline, ProductReviewInline)
     ordering = ("-created_at",)
+
+    exclude = ("images",)
+
+    inlines = (
+        ProductSeoInline,
+        ProductDimensionsInline,
+        ProductImageInline,
+        ProductSpecInline,
+        ProductReviewInline,
+    )
 
 
 @admin.action(description="Approve selected reviews")
@@ -116,7 +131,38 @@ class ProductReviewAdmin(admin.ModelAdmin):
     actions = (approve_reviews, reject_reviews, mark_pending_reviews)
 
 
-admin.site.register(ProductImage)
-admin.site.register(ProductSpec)
-admin.site.register(ProductSeo)
-admin.site.register(ProductDimensions)
+@admin.register(ProductImage)
+class ProductImageAdmin(admin.ModelAdmin):
+    """
+    ProductImage gallery admin.
+
+    This enables autocomplete in ProductImageInline (search by alt/id).
+    """
+    list_display = ("id", "alt", "src", "width", "height")
+    search_fields = ("alt", "id")
+    readonly_fields = ("id",)
+    ordering = ("-id",)
+
+
+@admin.register(ProductSpec)
+class ProductSpecAdmin(admin.ModelAdmin):
+    list_display = ("product", "key", "value")
+    search_fields = ("product__title", "product__slug", "key", "value")
+    readonly_fields = ("id",)
+    ordering = ("product", "key")
+
+
+@admin.register(ProductSeo)
+class ProductSeoAdmin(admin.ModelAdmin):
+    list_display = ("product", "title", "canonical")
+    search_fields = ("product__title", "product__slug", "title", "canonical")
+    readonly_fields = ("id",)
+    ordering = ("product",)
+
+
+@admin.register(ProductDimensions)
+class ProductDimensionsAdmin(admin.ModelAdmin):
+    list_display = ("product", "length_mm", "width_mm", "height_mm")
+    search_fields = ("product__title", "product__slug")
+    readonly_fields = ("id",)
+    ordering = ("product",)

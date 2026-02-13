@@ -23,7 +23,11 @@ class ProductImageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductImage
-        fields = ("id", "alt", "src", "width", "height", "position")
+        fields = ("id", "alt", "src", "width", "height")
+
+
+class ProductImageIdInputSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
 
 
 class ProductSpecSerializer(serializers.ModelSerializer):
@@ -139,7 +143,7 @@ class AdminProductWriteSerializer(serializers.ModelSerializer):
     inStock = serializers.BooleanField(source="in_stock")
     stockQuantity = serializers.IntegerField(source="stock_quantity", required=False, allow_null=True)
 
-    images = ProductImageSerializer(many=True, required=False)
+    images = ProductImageIdInputSerializer(many=True, required=False)
     specs = ProductSpecSerializer(many=True, required=False)
     seo = ProductSeoSerializer(required=False, allow_null=True)
     dimensions = ProductDimensionsSerializer(required=False, allow_null=True)
@@ -198,9 +202,15 @@ class AdminProductWriteSerializer(serializers.ModelSerializer):
         product = Product.objects.create(**validated_data)
 
         if images_data:
-            ProductImage.objects.bulk_create(
-                [ProductImage(product=product, **img) for img in images_data]
-            )
+            ids = [item["id"] for item in images_data]
+            images = list(ProductImage.objects.filter(id__in=ids))
+
+            found = {img.id for img in images}
+            missing = [str(i) for i in ids if i not in found]
+            if missing:
+                raise serializers.ValidationError({"images": f"Images not found: {', '.join(missing)}"})
+
+            product.images.set(images)
 
         if specs_data:
             ProductSpec.objects.bulk_create(
@@ -230,11 +240,15 @@ class AdminProductWriteSerializer(serializers.ModelSerializer):
         instance = super().update(instance, validated_data)
 
         if images_data is not None:
-            instance.images.all().delete()
-            if images_data:
-                ProductImage.objects.bulk_create(
-                    [ProductImage(product=instance, **img) for img in images_data]
-                )
+            ids = [item["id"] for item in images_data]
+            images = list(ProductImage.objects.filter(id__in=ids))
+
+            found = {img.id for img in images}
+            missing = [str(i) for i in ids if i not in found]
+            if missing:
+                raise serializers.ValidationError({"images": f"Images not found: {', '.join(missing)}"})
+
+            instance.images.set(images)
 
         if specs_data is not None:
             instance.specs.all().delete()
