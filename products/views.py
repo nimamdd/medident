@@ -1,5 +1,7 @@
+# products/views.py
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -13,8 +15,6 @@ from products.serializers import (
     ProductReviewSerializer,
     AdminReviewPatchSerializer,
 )
-
-
 
 
 class CategoriesListView(generics.ListAPIView):
@@ -130,7 +130,7 @@ class ProductBySlugView(generics.RetrieveAPIView):
 
     def get_queryset(self):
         return (
-            Product.objects.select_related("category")
+            Product.objects.select_related("category", "seo", "dimensions")
             .prefetch_related("images", "specs", "reviews__author")
             .all()
         )
@@ -142,7 +142,7 @@ class AdminProductsView(generics.ListCreateAPIView):
 
     Methods:
       - GET: list products
-      - POST: create product
+      - POST: create a product (supports nested create)
 
     Auth:
       - Requires: Authorization: Bearer <access_token>
@@ -154,63 +154,68 @@ class AdminProductsView(generics.ListCreateAPIView):
       - inStock: true|false|1|0
 
     POST input (JSON):
+      - slug: string (unique)
       - title: string
-      - slug: string
       - shortDescription: string
       - description: string (optional)
       - sku: string (optional)
       - brand: string (optional)
-      - categorySlug: string
-      - priceToman: int
-      - compareAtPriceToman: int (optional)
-      - inStock: bool
-      - stockQuantity: int (optional)
-      - rating: number (optional)
+      - categorySlug: string (required)
+      - priceToman: int (required)
+      - compareAtPriceToman: int (optional, nullable)
+      - inStock: bool (required)
+      - stockQuantity: int (optional, nullable)
+      - rating: number/string (optional, nullable)
 
-    Responses:
-      - 200 OK: list products
-      - 201 Created: product created
+      Nested (optional):
+      - images: ProductImage[]
+        - alt: string
+        - src: file/url/null (depends on your upload setup)
+        - width: int (optional)
+        - height: int (optional)
+        - position: int (optional)
+
+      - specs: ProductSpec[]
+        - key: string
+        - value: string
+        Note: keys must be unique per product.
+
+      - seo: ProductSeo (optional, nullable)
+        - title: string (optional)
+        - description: string (optional)
+        - canonical: url (optional)
+
+      - dimensions: ProductDimensions (optional, nullable)
+        - lengthMm: int (optional)
+        - widthMm: int (optional)
+        - heightMm: int (optional)
+
+    Response:
+      - 200 OK: list products (ProductSerializer)
+      - 201 Created: created product (ProductSerializer, includes images/specs/seo/dimensions/reviews)
       - 400 Bad Request: validation error
       - 401 Unauthorized: missing/invalid token
       - 403 Forbidden: not admin
     """
 
     permission_classes = (IsAdmin,)
+    queryset = (
+        Product.objects.select_related("category", "seo", "dimensions")
+        .prefetch_related("images", "specs", "reviews__author")
+        .all()
+        .order_by("-created_at")
+    )
 
     def get_serializer_class(self):
         if self.request.method == "POST":
             return AdminProductWriteSerializer
         return ProductSerializer
 
-    def get_queryset(self):
-        qs = (
-            Product.objects.select_related("category")
-            .prefetch_related("images", "specs")
-            .all()
-            .order_by("-created_at")
-        )
-
-        q = self.request.query_params.get("q")
-        if q:
-            qs = qs.filter(
-                Q(title__icontains=q)
-                | Q(slug__icontains=q)
-                | Q(sku__icontains=q)
-                | Q(brand__icontains=q)
-            )
-
-        category = self.request.query_params.get("category")
-        if category:
-            qs = qs.filter(category__slug=category)
-
-        in_stock = self.request.query_params.get("inStock")
-        if in_stock is not None:
-            if str(in_stock).lower() in ("true", "1"):
-                qs = qs.filter(in_stock=True)
-            elif str(in_stock).lower() in ("false", "0"):
-                qs = qs.filter(in_stock=False)
-
-        return qs
+    def create(self, request, *args, **kwargs):
+        s = self.get_serializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        product = s.save()
+        return Response(ProductSerializer(product).data, status=status.HTTP_201_CREATED)
 
 
 class AdminProductDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -218,8 +223,8 @@ class AdminProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     Admin retrieve, update, and delete a product.
 
     Methods:
-      - GET: retrieve product
-      - PATCH/PUT: update product
+      - GET: retrieve product (ProductSerializer)
+      - PATCH/PUT: update product (supports nested update)
       - DELETE: delete product
 
     Auth:
@@ -230,10 +235,20 @@ class AdminProductDetailView(generics.RetrieveUpdateDestroyAPIView):
       - id: string (UUID)
 
     PATCH/PUT input (JSON):
-      - same fields as create (partial allowed for PATCH)
+      Same fields as create are accepted. Partial update is allowed for PATCH.
+
+      Nested update behavior:
+      - If "images" is present in payload:
+          existing images will be replaced (delete all + recreate from input).
+      - If "specs" is present in payload:
+          existing specs will be replaced (delete all + recreate from input).
+      - If "seo" is present:
+          update_or_create will be used (or delete if explicitly null).
+      - If "dimensions" is present:
+          update_or_create will be used (or delete if explicitly null).
 
     Responses:
-      - 200 OK: product returned/updated
+      - 200 OK: product returned/updated (ProductSerializer, includes images/specs/seo/dimensions/reviews)
       - 204 No Content: product deleted
       - 400 Bad Request: validation error
       - 401 Unauthorized: missing/invalid token
@@ -242,13 +257,27 @@ class AdminProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
 
     permission_classes = (IsAdmin,)
-    queryset = Product.objects.select_related("category").prefetch_related("images", "specs").all()
+    queryset = (
+        Product.objects.select_related("category", "seo", "dimensions")
+        .prefetch_related("images", "specs", "reviews__author")
+        .all()
+    )
     lookup_field = "id"
 
     def get_serializer_class(self):
         if self.request.method in ("PATCH", "PUT"):
             return AdminProductWriteSerializer
         return ProductSerializer
+
+    def update(self, request, *args, **kwargs):
+        partial = request.method == "PATCH"
+        instance = self.get_object()
+
+        s = self.get_serializer(instance, data=request.data, partial=partial)
+        s.is_valid(raise_exception=True)
+        product = s.save()
+
+        return Response(ProductSerializer(product).data, status=status.HTTP_200_OK)
 
 
 class AdminProductReviewsView(generics.ListAPIView):
