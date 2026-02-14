@@ -20,6 +20,8 @@ class CategorySerializer(serializers.ModelSerializer):
 
 class ProductImageSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True)
+    src = serializers.ImageField(required=True)
+    alt = serializers.CharField(max_length=255, required=True)
 
     class Meta:
         model = ProductImage
