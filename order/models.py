@@ -6,14 +6,20 @@ from products.models import Product
 
 class Order(models.Model):
     class Status(models.TextChoices):
-        CREATED = "CREATED", "Created"
-        REQUIRES_PAYMENT = "REQUIRES_PAYMENT", "Requires payment"
-        COMPLETED = "COMPLETED", "Completed"
+        CREATED = "CREATED", "ایجاد شده"
+        REQUIRES_PAYMENT = "REQUIRES_PAYMENT", "نیازمند پرداخت"
+        COMPLETED = "COMPLETED", "تکمیل شده"
 
     class PaymentStatus(models.TextChoices):
-        UNPAID = "UNPAID", "Unpaid"
-        PAID = "PAID", "Paid"
-        FAILED = "FAILED", "Failed"
+        UNPAID = "UNPAID", "پرداخت نشده"
+        PAID = "PAID", "پرداخت شده"
+        FAILED = "FAILED", "ناموفق"
+
+    class FulfillmentStatus(models.TextChoices):
+        UNTRACKED = "UNTRACKED", "پیگیری نشده"
+        FAILED = "FAILED", "ناموفق"
+        SHIPPING = "SHIPPING", "در حال ارسال"
+        SHIPPED = "SHIPPED", "ارسال شده"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     order_number = models.CharField(max_length=32, unique=True)
@@ -22,6 +28,11 @@ class Order(models.Model):
 
     status = models.CharField(max_length=32, choices=Status.choices, default=Status.CREATED)
     payment_status = models.CharField(max_length=16, choices=PaymentStatus.choices, default=PaymentStatus.UNPAID)
+    fulfillment_status = models.CharField(
+        max_length=16,
+        choices=FulfillmentStatus.choices,
+        default=FulfillmentStatus.UNTRACKED,
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
 

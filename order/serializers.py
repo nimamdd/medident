@@ -57,17 +57,26 @@ class OrderListSerializer(serializers.ModelSerializer):
     orderNumber = serializers.CharField(source="order_number", read_only=True)
     amountToman = serializers.IntegerField(source="amount_toman", read_only=True)
     paymentStatus = serializers.CharField(source="payment_status", read_only=True)
+    fulfillmentStatus = serializers.CharField(source="fulfillment_status", read_only=True)
     createdAt = serializers.DateTimeField(source="created_at", read_only=True)
 
     class Meta:
         model = Order
-        fields = ("orderNumber", "amountToman", "status", "paymentStatus", "createdAt")
+        fields = (
+            "orderNumber",
+            "amountToman",
+            "status",
+            "paymentStatus",
+            "fulfillmentStatus",
+            "createdAt",
+        )
 
 
 class OrderReadSerializer(serializers.ModelSerializer):
     orderNumber = serializers.CharField(source="order_number", read_only=True)
     amountToman = serializers.IntegerField(source="amount_toman", read_only=True)
     paymentStatus = serializers.CharField(source="payment_status", read_only=True)
+    fulfillmentStatus = serializers.CharField(source="fulfillment_status", read_only=True)
     createdAt = serializers.DateTimeField(source="created_at", read_only=True)
     checkout = CheckoutReadSerializer(read_only=True)
 
@@ -78,6 +87,7 @@ class OrderReadSerializer(serializers.ModelSerializer):
             "amountToman",
             "status",
             "paymentStatus",
+            "fulfillmentStatus",
             "createdAt",
             "checkout",
         )
@@ -93,3 +103,6 @@ class OrderListDetailedSerializer(OrderReadSerializer):
 class PaymentUpdateSerializer(serializers.Serializer):
     paymentStatus = serializers.ChoiceField(choices=Order.PaymentStatus.choices)
 
+
+class AdminFulfillmentUpdateSerializer(serializers.Serializer):
+    fulfillmentStatus = serializers.ChoiceField(choices=Order.FulfillmentStatus.choices)

@@ -9,8 +9,10 @@ from order.serializers import (
     OrderListSerializer,
     PaymentUpdateSerializer,
     OrderListDetailedSerializer,
+    AdminFulfillmentUpdateSerializer,
 )
 from order.services import create_order_from_checkout
+from products.permissions import IsAdmin
 
 
 class CheckoutCreateView(APIView):
@@ -122,5 +124,57 @@ class OrderPaymentUpdateView(APIView):
         if order.payment_status == Order.PaymentStatus.PAID:
             order.status = Order.Status.COMPLETED
         order.save(update_fields=["payment_status", "status"])
+
+        return Response(OrderReadSerializer(order).data, status=status.HTTP_200_OK)
+
+
+class AdminOrderListView(generics.ListAPIView):
+    """
+    Admin list paid orders with checkout details.
+    """
+
+    permission_classes = (IsAdmin,)
+    serializer_class = OrderListDetailedSerializer
+
+    def get_queryset(self):
+        return (
+            Order.objects.filter(payment_status=Order.PaymentStatus.PAID)
+            .select_related("user", "checkout")
+            .prefetch_related("checkout__items", "checkout__items__product")
+            .order_by("-created_at")
+        )
+
+
+class AdminOrderDetailView(generics.RetrieveAPIView):
+    """
+    Admin retrieve order details by order number.
+    """
+
+    permission_classes = (IsAdmin,)
+    serializer_class = OrderReadSerializer
+    lookup_field = "order_number"
+
+    def get_queryset(self):
+        return Order.objects.select_related("user", "checkout").prefetch_related(
+            "checkout__items",
+            "checkout__items__product",
+        )
+
+
+class AdminOrderFulfillmentUpdateView(APIView):
+    """
+    Admin update fulfillment status for paid orders.
+    """
+
+    permission_classes = (IsAdmin,)
+
+    def patch(self, request, order_number):
+        order = generics.get_object_or_404(Order, order_number=order_number, payment_status=Order.PaymentStatus.PAID)
+
+        s = AdminFulfillmentUpdateSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+
+        order.fulfillment_status = s.validated_data["fulfillmentStatus"]
+        order.save(update_fields=["fulfillment_status"])
 
         return Response(OrderReadSerializer(order).data, status=status.HTTP_200_OK)

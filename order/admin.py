@@ -18,9 +18,10 @@ class OrderAdmin(admin.ModelAdmin):
         "amount_toman",
         "status",
         "payment_status",
+        "fulfillment_status",
         "created_at",
     )
-    list_filter = ("status", "payment_status", "created_at")
+    list_filter = ("status", "payment_status", "fulfillment_status", "created_at")
     search_fields = ("order_number", "user__phone", "user__email")
     ordering = ("-created_at",)
     date_hierarchy = "created_at"
