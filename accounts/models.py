@@ -77,3 +77,19 @@ class PhoneOTP(models.Model):
 
     def is_expired(self):
         return timezone.now() >= self.expires_at
+
+
+class ContactMessage(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255)
+    phone = models.CharField(max_length=32)
+    message = models.TextField()
+    client_info = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "id"]
+
+    def __str__(self):
+        return f"{self.name} ({self.phone})"
+

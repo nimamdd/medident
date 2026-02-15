@@ -4,7 +4,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from accounts.models import User, PhoneOTP
+from accounts.models import User, PhoneOTP, ContactMessage
 from accounts.serializers import (
     OTPStartSerializer,
     OTPVerifySerializer,
@@ -12,6 +12,8 @@ from accounts.serializers import (
     UserUpdateSerializer,
     AdminUserReadSerializer,
     AdminUserUpdateSerializer,
+    ContactMessageCreateSerializer,
+    ContactMessageReadSerializer,
 )
 from .permission import IsStaff
 from .utils import issue_otp
@@ -199,3 +201,37 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = (IsStaff,)
     queryset = User.objects.all()
     serializer_class = AdminUserUpdateSerializer
+
+
+class ContactMessageCreateView(generics.CreateAPIView):
+    """
+    Create a contact message.
+
+    Input (JSON):
+      - name: string
+      - phone: string
+      - message: string
+    """
+
+    permission_classes = (permissions.AllowAny,)
+    serializer_class = ContactMessageCreateSerializer
+
+    def perform_create(self, serializer):
+        meta = self.request.META
+        forwarded = meta.get("HTTP_X_FORWARDED_FOR")
+        ip = forwarded.split(",")[0].strip() if forwarded else meta.get("REMOTE_ADDR")
+        user_agent = meta.get("HTTP_USER_AGENT", "")
+        client_info = f"ip={ip}; ua={user_agent}"
+        serializer.save(client_info=client_info)
+
+
+class AdminContactMessageListView(generics.ListAPIView):
+    """
+    Admin list contact messages.
+    """
+
+    permission_classes = (IsStaff,)
+    serializer_class = ContactMessageReadSerializer
+
+    def get_queryset(self):
+        return ContactMessage.objects.all().order_by("-created_at")

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from accounts.models import User
+from accounts.models import User, ContactMessage
 
 
 class OTPStartSerializer(serializers.Serializer):
@@ -32,3 +32,18 @@ class AdminUserReadSerializer(UserReadSerializer):
 class AdminUserUpdateSerializer(UserUpdateSerializer):
     class Meta(UserUpdateSerializer.Meta):
         fields = UserUpdateSerializer.Meta.fields + ("is_active", "is_admin")
+
+
+class ContactMessageCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContactMessage
+        fields = ("name", "phone", "message")
+
+
+class ContactMessageReadSerializer(serializers.ModelSerializer):
+    createdAt = serializers.DateTimeField(source="created_at", read_only=True)
+
+    class Meta:
+        model = ContactMessage
+        fields = ("id", "name", "phone", "message", "client_info", "createdAt")
+        read_only_fields = ("id", "createdAt")

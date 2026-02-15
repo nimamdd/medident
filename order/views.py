@@ -138,7 +138,7 @@ class AdminOrderListView(generics.ListAPIView):
 
     def get_queryset(self):
         return (
-            Order.objects.filter(payment_status=Order.PaymentStatus.PAID)
+            Order.objects.all()
             .select_related("user", "checkout")
             .prefetch_related("checkout__items", "checkout__items__product")
             .order_by("-created_at")
@@ -169,7 +169,7 @@ class AdminOrderFulfillmentUpdateView(APIView):
     permission_classes = (IsAdmin,)
 
     def patch(self, request, order_number):
-        order = generics.get_object_or_404(Order, order_number=order_number, payment_status=Order.PaymentStatus.PAID)
+        order = generics.get_object_or_404(Order, order_number=order_number)
 
         s = AdminFulfillmentUpdateSerializer(data=request.data)
         s.is_valid(raise_exception=True)

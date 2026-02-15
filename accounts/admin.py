@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from .models import User, PhoneOTP
+from .models import User, PhoneOTP, ContactMessage
 
 
 @admin.register(User)
@@ -35,4 +35,12 @@ class PhoneOTPAdmin(admin.ModelAdmin):
     list_display = ("id", "phone", "code", "created_at", "expires_at", "used", "attempts_left")
     search_fields = ("phone",)
     list_filter = ("used", "created_at")
+    readonly_fields = ("id", "created_at")
+
+
+@admin.register(ContactMessage)
+class ContactMessageAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "phone", "created_at")
+    search_fields = ("name", "phone")
+    list_filter = ("created_at",)
     readonly_fields = ("id", "created_at")

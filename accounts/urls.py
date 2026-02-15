@@ -1,6 +1,6 @@
 from django.urls import path
 
-from accounts.views import AuthStartView, AuthVerifyView, MeView, UserListView, UserDetailView
+from accounts.views import AuthStartView, AuthVerifyView, MeView, UserListView, UserDetailView, ContactMessageCreateView, AdminContactMessageListView
 
 urlpatterns = [
     path("auth/start/", AuthStartView.as_view()),
@@ -8,4 +8,6 @@ urlpatterns = [
     path("me/", MeView.as_view()),
     path("users/", UserListView.as_view()),
     path("users/<int:pk>/", UserDetailView.as_view()),
+    path("contact/", ContactMessageCreateView.as_view()),
+    path("admin/contact/", AdminContactMessageListView.as_view()),
 ]
