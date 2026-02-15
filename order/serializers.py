@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from order.models import Order, Checkout, CheckoutItem
+from order.models import Order, Checkout, CheckoutItem, DailySales
 
 
 class CheckoutItemInputSerializer(serializers.Serializer):
@@ -106,3 +106,12 @@ class PaymentUpdateSerializer(serializers.Serializer):
 
 class AdminFulfillmentUpdateSerializer(serializers.Serializer):
     fulfillmentStatus = serializers.ChoiceField(choices=Order.FulfillmentStatus.choices)
+
+
+class DailySalesReadSerializer(serializers.ModelSerializer):
+    totalToman = serializers.IntegerField(source="total_toman", read_only=True)
+    ordersCount = serializers.IntegerField(source="orders_count", read_only=True)
+
+    class Meta:
+        model = DailySales
+        fields = ("date", "totalToman", "ordersCount")

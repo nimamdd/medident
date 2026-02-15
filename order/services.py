@@ -3,7 +3,7 @@ from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 
-from order.models import Order, Checkout, CheckoutItem
+from order.models import Order, Checkout, CheckoutItem, DailySales
 from products.models import Product
 
 
@@ -93,3 +93,12 @@ def create_order_from_checkout(user, *, phone, national_id, city, address, posta
 
     return order
 
+
+@transaction.atomic
+def record_daily_sales_for_order(order: Order):
+    sale_date = timezone.localdate(order.created_at)
+    daily, _ = DailySales.objects.select_for_update().get_or_create(date=sale_date)
+    DailySales.objects.filter(id=daily.id).update(
+        total_toman=F("total_toman") + int(order.amount_toman),
+        orders_count=F("orders_count") + 1,
+    )

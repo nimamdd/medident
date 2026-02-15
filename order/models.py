@@ -58,3 +58,17 @@ class CheckoutItem(models.Model):
     quantity = models.PositiveIntegerField()
     unit_price_toman = models.BigIntegerField()
     line_total_toman = models.BigIntegerField()
+
+
+class DailySales(models.Model):
+    date = models.DateField(unique=True)
+    total_toman = models.BigIntegerField(default=0)
+    orders_count = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-date"]
+
+    def __str__(self):
+        return f"{self.date}"

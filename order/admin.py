@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from order.models import Order, Checkout, CheckoutItem
+from order.models import Order, Checkout, CheckoutItem, DailySales
 
 
 class CheckoutItemInline(admin.TabularInline):
@@ -61,3 +61,11 @@ class CheckoutItemAdmin(admin.ModelAdmin):
     list_filter = ("product",)
     search_fields = ("product__title", "checkout__order__order_number")
     raw_id_fields = ("checkout", "product")
+
+
+@admin.register(DailySales)
+class DailySalesAdmin(admin.ModelAdmin):
+    list_display = ("date", "total_toman", "orders_count", "updated_at")
+    list_filter = ("date",)
+    ordering = ("-date",)
+    readonly_fields = ("created_at", "updated_at")

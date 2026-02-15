@@ -8,6 +8,7 @@ from order.views import (
     AdminOrderListView,
     AdminOrderDetailView,
     AdminOrderFulfillmentUpdateView,
+    AdminDailySalesListView,
 )
 
 
@@ -20,4 +21,5 @@ urlpatterns = [
     path("admin/orders/", AdminOrderListView.as_view(), name="admin-order-list"),
     path("admin/orders/<str:order_number>/", AdminOrderDetailView.as_view(), name="admin-order-detail"),
     path("admin/orders/<str:order_number>/fulfillment/", AdminOrderFulfillmentUpdateView.as_view(), name="admin-order-fulfillment"),
+    path("admin/sales/daily/", AdminDailySalesListView.as_view(), name="admin-daily-sales"),
 ]

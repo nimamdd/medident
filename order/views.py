@@ -2,7 +2,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from order.models import Order
+from order.models import Order, DailySales
 from order.serializers import (
     CheckoutCreateSerializer,
     OrderReadSerializer,
@@ -10,8 +10,9 @@ from order.serializers import (
     PaymentUpdateSerializer,
     OrderListDetailedSerializer,
     AdminFulfillmentUpdateSerializer,
+    DailySalesReadSerializer,
 )
-from order.services import create_order_from_checkout
+from order.services import create_order_from_checkout, record_daily_sales_for_order
 from products.permissions import IsAdmin
 
 
@@ -120,17 +121,21 @@ class OrderPaymentUpdateView(APIView):
         s = PaymentUpdateSerializer(data=request.data)
         s.is_valid(raise_exception=True)
 
+        was_paid = order.payment_status == Order.PaymentStatus.PAID
         order.payment_status = s.validated_data["paymentStatus"]
         if order.payment_status == Order.PaymentStatus.PAID:
             order.status = Order.Status.COMPLETED
         order.save(update_fields=["payment_status", "status"])
+
+        if not was_paid and order.payment_status == Order.PaymentStatus.PAID:
+            record_daily_sales_for_order(order)
 
         return Response(OrderReadSerializer(order).data, status=status.HTTP_200_OK)
 
 
 class AdminOrderListView(generics.ListAPIView):
     """
-    Admin list paid orders with checkout details.
+    Admin list all orders with checkout details.
     """
 
     permission_classes = (IsAdmin,)
@@ -178,3 +183,15 @@ class AdminOrderFulfillmentUpdateView(APIView):
         order.save(update_fields=["fulfillment_status"])
 
         return Response(OrderReadSerializer(order).data, status=status.HTTP_200_OK)
+
+
+class AdminDailySalesListView(generics.ListAPIView):
+    """
+    Admin list daily sales aggregates.
+    """
+
+    permission_classes = (IsAdmin,)
+    serializer_class = DailySalesReadSerializer
+
+    def get_queryset(self):
+        return DailySales.objects.all().order_by("-date")
