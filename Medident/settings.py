@@ -186,9 +186,17 @@ if PRODUCTION:
                 "level": "DEBUG",
             }
         },
-        "root": {
-            "handlers": ["file"],
-            "level": "DEBUG",
+        "root": {"handlers": ["file"], "level": "DEBUG"},
+        "loggers": {
+            "django.server": {
+                "handlers": ["file"],
+                "level": "INFO",
+                "propagate": False,
+            },
+            "django.request": {
+                "handlers": ["file"],
+                "level": "WARNING",
+                "propagate": False,
+            },
         },
     }
-
