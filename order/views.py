@@ -6,11 +6,11 @@ from order.models import Order, DailySales
 from order.serializers import (
     CheckoutCreateSerializer,
     OrderReadSerializer,
-    OrderListSerializer,
     PaymentUpdateSerializer,
     OrderListDetailedSerializer,
     AdminFulfillmentUpdateSerializer,
     DailySalesReadSerializer,
+    AdminDashboardOverviewSerializer,
 )
 from order.services import create_order_from_checkout, record_daily_sales_for_order
 from products.permissions import IsAdmin
@@ -25,16 +25,17 @@ class CheckoutCreateView(APIView):
 
     POST input (JSON):
       - phone: string
-      - nationalId: string
+      - nationalId: string (10 chars)
       - city: string
       - address: string
-      - postalCode: string
+      - postalCode: string (10 chars)
       - clientTotalToman: int
-      - items: list[{productId: uuid, quantity: int}]
+      - items: list[{productId: uuid, quantity: int>=1}]
 
-    Response:
+    Responses:
       - 201 Created: order details
       - 400 Bad Request: validation or stock/pricing error
+      - 401 Unauthorized: missing/invalid token
     """
 
     permission_classes = (permissions.IsAuthenticated,)
@@ -62,10 +63,14 @@ class CheckoutCreateView(APIView):
 
 class OrderListView(generics.ListAPIView):
     """
-    List current user's orders.
+    List current user's orders (newest first).
 
     Auth:
       - Requires: Authorization: Bearer <access_token>
+
+    Responses:
+      - 200 OK: list of orders with checkout items
+      - 401 Unauthorized: missing/invalid token
     """
 
     permission_classes = (permissions.IsAuthenticated,)
@@ -89,6 +94,11 @@ class OrderDetailView(generics.RetrieveAPIView):
 
     URL params:
       - order_number: string
+
+    Responses:
+      - 200 OK: order details
+      - 401 Unauthorized: missing/invalid token
+      - 404 Not Found: order not found
     """
 
     permission_classes = (permissions.IsAuthenticated,)
@@ -111,6 +121,12 @@ class OrderPaymentUpdateView(APIView):
 
     PATCH input (JSON):
       - paymentStatus: UNPAID|PAID|FAILED
+
+    Responses:
+      - 200 OK: updated order
+      - 400 Bad Request: validation error
+      - 401 Unauthorized: missing/invalid token
+      - 404 Not Found: order not found
     """
 
     permission_classes = (permissions.IsAuthenticated,)
@@ -135,7 +151,16 @@ class OrderPaymentUpdateView(APIView):
 
 class AdminOrderListView(generics.ListAPIView):
     """
-    Admin list all orders with checkout details.
+    Admin list all orders with checkout details (newest first).
+
+    Auth:
+      - Requires: Authorization: Bearer <access_token>
+      - Requires: is_admin == True
+
+    Responses:
+      - 200 OK: list of orders
+      - 401 Unauthorized: missing/invalid token
+      - 403 Forbidden: not admin
     """
 
     permission_classes = (IsAdmin,)
@@ -153,6 +178,19 @@ class AdminOrderListView(generics.ListAPIView):
 class AdminOrderDetailView(generics.RetrieveAPIView):
     """
     Admin retrieve order details by order number.
+
+    Auth:
+      - Requires: Authorization: Bearer <access_token>
+      - Requires: is_admin == True
+
+    URL params:
+      - order_number: string
+
+    Responses:
+      - 200 OK: order details
+      - 401 Unauthorized: missing/invalid token
+      - 403 Forbidden: not admin
+      - 404 Not Found: order not found
     """
 
     permission_classes = (IsAdmin,)
@@ -168,7 +206,24 @@ class AdminOrderDetailView(generics.RetrieveAPIView):
 
 class AdminOrderFulfillmentUpdateView(APIView):
     """
-    Admin update fulfillment status for paid orders.
+    Admin update fulfillment status for orders.
+
+    Auth:
+      - Requires: Authorization: Bearer <access_token>
+      - Requires: is_admin == True
+
+    URL params:
+      - order_number: string
+
+    PATCH input (JSON):
+      - fulfillmentStatus: UNTRACKED|FAILED|SHIPPING|SHIPPED
+
+    Responses:
+      - 200 OK: updated order
+      - 400 Bad Request: validation error
+      - 401 Unauthorized: missing/invalid token
+      - 403 Forbidden: not admin
+      - 404 Not Found: order not found
     """
 
     permission_classes = (IsAdmin,)
@@ -187,7 +242,16 @@ class AdminOrderFulfillmentUpdateView(APIView):
 
 class AdminDailySalesListView(generics.ListAPIView):
     """
-    Admin list daily sales aggregates.
+    Admin list daily sales aggregates (newest first).
+
+    Auth:
+      - Requires: Authorization: Bearer <access_token>
+      - Requires: is_admin == True
+
+    Responses:
+      - 200 OK: list of daily sales rows
+      - 401 Unauthorized: missing/invalid token
+      - 403 Forbidden: not admin
     """
 
     permission_classes = (IsAdmin,)
@@ -195,3 +259,69 @@ class AdminDailySalesListView(generics.ListAPIView):
 
     def get_queryset(self):
         return DailySales.objects.all().order_by("-date")
+
+
+class AdminDashboardOverviewView(APIView):
+    """
+    Admin dashboard overview metrics.
+
+    Auth:
+      - Requires: Authorization: Bearer <access_token>
+      - Requires: is_admin == True
+
+    Response:
+      - 200 OK: dashboard metrics
+        {
+          "totalRevenueToman": int,
+          "totalOrders": int,
+          "totalCustomers": int,
+          "conversionRate": float,
+          "topProducts": [{"productId": uuid, "productTitle": string, "quantitySold": int}]
+        }
+      - 401 Unauthorized: missing/invalid token
+      - 403 Forbidden: not admin
+    """
+
+    permission_classes = (IsAdmin,)
+
+    def get(self, request):
+        from django.db.models import Sum, Count
+        from django.db.models.functions import Coalesce
+
+        paid_orders = Order.objects.filter(payment_status=Order.PaymentStatus.PAID)
+
+        totals = paid_orders.aggregate(
+            total_revenue=Coalesce(Sum("amount_toman"), 0),
+            total_orders=Coalesce(Count("id"), 0),
+        )
+
+        total_customers = Order.objects.values("user_id").distinct().count()
+        conversion_rate = (totals["total_orders"] / total_customers) if total_customers else 0
+
+        top_products = (
+            paid_orders.values(
+                "checkout__items__product_id",
+                "checkout__items__product__title",
+            )
+            .annotate(quantity_sold=Coalesce(Sum("checkout__items__quantity"), 0))
+            .order_by("-quantity_sold")[:5]
+        )
+
+        payload = {
+            "totalRevenueToman": totals["total_revenue"],
+            "totalOrders": totals["total_orders"],
+            "totalCustomers": total_customers,
+            "conversionRate": round(conversion_rate, 4),
+            "topProducts": [
+                {
+                    "productId": row["checkout__items__product_id"],
+                    "productTitle": row["checkout__items__product__title"],
+                    "quantitySold": row["quantity_sold"],
+                }
+                for row in top_products
+                if row["checkout__items__product_id"]
+            ],
+        }
+
+        s = AdminDashboardOverviewSerializer(payload)
+        return Response(s.data, status=status.HTTP_200_OK)

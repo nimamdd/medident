@@ -27,7 +27,7 @@ class CategoriesListView(generics.ListAPIView):
       - GET
 
     Response:
-      - 200 OK: list of categories
+      - 200 OK: list of categories ordered by title
     """
 
     permission_classes = (permissions.AllowAny,)
@@ -49,17 +49,11 @@ class ProductsListView(generics.ListAPIView):
       - maxPrice: int (toman)
       - sort: string (newest|price_asc|price_desc|rating_desc)
       - q: string (search in title/description/sku/brand)
-      - page: int
-      - pageSize: int
+      - page: int (if pagination enabled)
+      - pageSize: int (if pagination enabled)
 
     Response:
-      - 200 OK: paginated items
-        {
-          "items": Product[],
-          "page": number,
-          "pageSize": number,
-          "total": number
-        }
+      - 200 OK: list or paginated items
     """
 
     permission_classes = (permissions.AllowAny,)
@@ -190,8 +184,8 @@ class AdminProductsView(generics.ListCreateAPIView):
       - dimensions: {lengthMm?: int, widthMm?: int, heightMm?: int} | null
 
     Responses:
-      - 200 OK: list products (ProductSerializer)
-      - 201 Created: created product (ProductSerializer)
+      - 200 OK: list products
+      - 201 Created: created product
       - 400 Bad Request: validation error
       - 401 Unauthorized: missing/invalid token
       - 403 Forbidden: not admin
@@ -222,8 +216,8 @@ class AdminProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     Admin retrieve, update, and delete a product.
 
     Methods:
-      - GET: retrieve product (ProductSerializer)
-      - PATCH/PUT: update product (AdminProductWriteSerializer input, ProductSerializer output)
+      - GET: retrieve product
+      - PATCH/PUT: update product
       - DELETE: delete product
 
     Auth:
@@ -236,29 +230,14 @@ class AdminProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     PATCH/PUT input (JSON):
       Same fields as create are accepted. Partial update is allowed for PATCH.
 
-      Images behavior (M2M to gallery):
-      - If "images" is omitted: images are NOT changed.
-      - If "images" is []: all images will be cleared (product.images.set([])).
-      - If "images" is provided: it replaces the product's images (product.images.set([...])).
-      - This endpoint does NOT upload image files; use the gallery endpoints to upload first.
-
-      Specs behavior:
-      - If "specs" is omitted: specs are NOT changed.
-      - If "specs" is present: existing specs will be replaced (delete + recreate).
-        Note: spec keys must be unique per product.
-
-      SEO behavior:
-      - If "seo" is omitted: seo is NOT changed.
-      - If "seo" is null: seo row will be deleted.
-      - If "seo" is an object: update_or_create will be used.
-
-      Dimensions behavior:
-      - If "dimensions" is omitted: dimensions are NOT changed.
-      - If "dimensions" is null: dimensions row will be deleted.
-      - If "dimensions" is an object: update_or_create will be used.
+      Optional nested:
+      - images: list[{id: UUID}]  # attaches gallery images
+      - specs: list[{key: string, value: string}]  # unique keys
+      - seo: {title?: string, description?: string, canonical?: url} | null
+      - dimensions: {lengthMm?: int, widthMm?: int, heightMm?: int} | null
 
     Responses:
-      - 200 OK: product returned/updated (ProductSerializer)
+      - 200 OK: product returned/updated
       - 204 No Content: product deleted
       - 400 Bad Request: validation error
       - 401 Unauthorized: missing/invalid token
@@ -439,7 +418,7 @@ class AdminCategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
       - 404 Not Found: category not found
 
     Notes:
-      - Deleting a category that is referenced by products may fail because Product.category uses PROTECT.
+      - Deleting a category referenced by products may fail because Product.category uses PROTECT.
     """
     permission_classes = (IsAdmin,)
     serializer_class = CategorySerializer
@@ -465,11 +444,11 @@ class AdminProductImagesView(generics.ListCreateAPIView):
        POST input (multipart/form-data):
          - src: file (required)
          - alt: string (optional, nullable)
-         - width: int (optional)   # only if you want to send manually; otherwise leave empty
-         - height: int (optional)  # only if you want to send manually; otherwise leave empty
+         - width: int (optional)
+         - height: int (optional)
 
        Notes:
-         - This endpoint returns the ProductImage "id". Use that id when attaching images to products.
+         - Returns ProductImage "id" for attaching to products.
 
        Responses:
          - 200 OK: list images
@@ -515,7 +494,7 @@ class AdminProductImageDetailView(generics.RetrieveUpdateDestroyAPIView):
         - height: int (optional, nullable)
 
     Notes:
-      - If an image is linked to products, deleting it will remove the M2M relationships as well.
+      - Deleting an image removes M2M relations from products.
 
     Responses:
       - 200 OK: image returned/updated

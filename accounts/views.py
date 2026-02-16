@@ -24,15 +24,14 @@ class AuthStartView(generics.GenericAPIView):
     Start auth by phone number (register or login) and send an OTP.
 
     Behavior:
-      - If user with phone does not exist, it will be created (register).
-      - If user exists, it will proceed as login.
-      - In both cases, an OTP is sent to the phone.
+      - Creates the user if it does not exist.
+      - Sends OTP to the phone if the user is active.
 
     Input (JSON):
       - phone: string (11 digits)
 
     Responses:
-      - 200 OK: OTP sent
+      - 200 OK: {"detail": "OTP sent"}
       - 403 Forbidden: user is disabled
       - 400 Bad Request: validation error
     """
@@ -60,14 +59,14 @@ class AuthVerifyView(generics.GenericAPIView):
 
     Input (JSON):
       - phone: string (11 digits)
-      - code: string (OTP)
+      - code: string (5-6 chars)
 
     Responses:
-      - 200 OK: returns access and refresh tokens
-      - 400 Bad Request: expired OTP / invalid OTP
+      - 200 OK: {"refresh": "...", "access": "..."}
+      - 400 Bad Request: expired OTP / invalid OTP / validation error
+      - 403 Forbidden: user is disabled
       - 404 Not Found: OTP not found / user not found
       - 429 Too Many Requests: no attempts left
-      - 400 Bad Request: validation error
     """
 
     permission_classes = (permissions.AllowAny,)
@@ -117,17 +116,17 @@ class MeView(generics.RetrieveUpdateAPIView):
       - Requires: Authorization: Bearer <access_token>
 
     GET Response:
-      - 200 OK: returns the current user's profile
+      - 200 OK: current user profile
 
     PATCH/PUT Input (JSON):
-      - full_name: string (optional)
-      - national_id: string (optional)
-      - city: string (optional)
-      - address: string (optional)
-      - email: string (optional)
+      - email?: string
+      - full_name?: string
+      - national_id?: string
+      - city?: string
+      - address?: string
 
     PATCH/PUT Responses:
-      - 200 OK: returns updated profile
+      - 200 OK: updated profile
       - 400 Bad Request: validation error
       - 401 Unauthorized: missing/invalid token
     """
@@ -151,12 +150,8 @@ class UserListView(generics.ListAPIView):
       - Requires: Authorization: Bearer <access_token>
       - Requires: is_staff == True
 
-    Query params:
-      - page: int (optional, if pagination is enabled)
-      - q: string (optional, if you implement search)
-
     Responses:
-      - 200 OK: paginated list (or full list) of users
+      - 200 OK: paginated list (if pagination enabled)
       - 401 Unauthorized: missing/invalid token
       - 403 Forbidden: not staff
     """
@@ -168,7 +163,7 @@ class UserListView(generics.ListAPIView):
 
 class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
-    Retrieve or update a user (admin only).
+    Retrieve, update, or delete a user (admin only).
 
     Auth:
       - Requires: Authorization: Bearer <access_token>
@@ -178,20 +173,21 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
       - pk: int (User ID)
 
     GET Response:
-      - 200 OK: returns the user data
+      - 200 OK: user data
       - 404 Not Found: user not found
 
     PATCH/PUT Input (JSON):
-      - full_name: string (optional)
-      - national_id: string (optional)
-      - city: string (optional)
-      - address: string (optional)
-      - email: string (optional)
-      - is_active: bool (optional)
-      - is_admin: bool (optional)
+      - email?: string
+      - full_name?: string
+      - national_id?: string
+      - city?: string
+      - address?: string
+      - is_active?: bool
+      - is_admin?: bool
 
-    PATCH/PUT Responses:
-      - 200 OK: returns updated user
+    Responses:
+      - 200 OK: updated user
+      - 204 No Content: user deleted
       - 400 Bad Request: validation error
       - 401 Unauthorized: missing/invalid token
       - 403 Forbidden: not staff
@@ -211,6 +207,13 @@ class ContactMessageCreateView(generics.CreateAPIView):
       - name: string
       - phone: string
       - message: string
+
+    Notes:
+      - client_info is auto-filled from IP and User-Agent.
+
+    Responses:
+      - 201 Created: created message
+      - 400 Bad Request: validation error
     """
 
     permission_classes = (permissions.AllowAny,)
@@ -228,6 +231,15 @@ class ContactMessageCreateView(generics.CreateAPIView):
 class AdminContactMessageListView(generics.ListAPIView):
     """
     Admin list contact messages.
+
+    Auth:
+      - Requires: Authorization: Bearer <access_token>
+      - Requires: is_staff == True
+
+    Responses:
+      - 200 OK: list of contact messages (newest first)
+      - 401 Unauthorized: missing/invalid token
+      - 403 Forbidden: not staff
     """
 
     permission_classes = (IsStaff,)

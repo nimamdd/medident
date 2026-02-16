@@ -115,3 +115,18 @@ class DailySalesReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = DailySales
         fields = ("date", "totalToman", "ordersCount")
+
+
+class AdminTopProductSerializer(serializers.Serializer):
+    productId = serializers.UUIDField()
+    productTitle = serializers.CharField()
+    quantitySold = serializers.IntegerField()
+
+
+class AdminDashboardOverviewSerializer(serializers.Serializer):
+    totalRevenueToman = serializers.IntegerField()
+    totalOrders = serializers.IntegerField()
+    totalCustomers = serializers.IntegerField()
+    conversionRate = serializers.FloatField()
+    topProducts = AdminTopProductSerializer(many=True)
+
