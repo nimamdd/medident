@@ -172,3 +172,23 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
 
+if PRODUCTION:
+    LOG_DIR = BASE_DIR / "logs"
+    LOG_DIR.mkdir(exist_ok=True)
+
+    LOGGING = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "handlers": {
+            "file": {
+                "class": "logging.FileHandler",
+                "filename": str(LOG_DIR / "app.log"),
+                "level": "DEBUG",
+            }
+        },
+        "root": {
+            "handlers": ["file"],
+            "level": "DEBUG",
+        },
+    }
+
